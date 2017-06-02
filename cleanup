@@ -1,3 +1,16 @@
+rm -fr _builds _install
+#Cleanup knitr byproducts
+rm -r inst/documentation/*.tex \
+      inst/documentation/*.toc \
+      inst/documentation/*.idx \
+      inst/documentation/*.log \
+      inst/documentation/*.ind \
+      inst/documentation/*.ilg \
+      inst/documentation/*synctex* 2>/dev/null
+
+exit
+
+# OLD stuff
 rm src/*.o src/*.so src/Makevars *~ config.* 2>/dev/null
 rm -r autom4te*/ 2>/dev/null
 rm -r conf*/ 2>/dev/null
