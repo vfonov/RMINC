@@ -1,0 +1,84 @@
+#!/bin/bash
+set -x -e 
+# based on https://github.com/stnava/ITKR/blob/master/configure and https://github.com/stnava/ITKR/blob/master/configure
+
+env
+
+if [[ `uname` -eq Darwin ]] ; then
+  CMAKE_BUILD_TYPE=Release
+fi
+if [[ $TRAVIS -eq true ]] ; then
+  CMAKE_BUILD_TYPE=Release
+fi
+
+# figure out where minc-toolkit is installed
+if [[ -z $MINC_TOOLKIT ]];then
+# try to find minc-toolkit in known locations
+    some_locations=$(find /opt -name mincresample -type f|head)
+    
+    if [[ ! -z $some_locations ]];then
+        MINC_TOOLKIT=${some_locations/bin\/mincresample}
+    fi
+else
+    echo "Using minc-tolkit from ${MINC_TOOLKIT}"
+fi
+
+if [[ -z $MINC_TOOLKIT ]];then
+    echo "Can't locate minc-toolkit"
+    echo "Specify location using MINC_TOOLKIT environment variable !"
+    exit 1
+fi
+
+R_HOME=$(R RHOME)
+if [[ -z ${R_HOME} ]]; then
+  echo "could not determine R_HOME"
+  exit 1
+fi
+
+if [[ -z ${R_INCLUDE_DIR} ]];then
+ echo "R_INCLUDE_DIR is not set"
+ exit 1
+fi
+
+# TODO: pass proper compiler to cmake too
+CC=$("${R_HOME}/bin/R" CMD config CC)
+CXX=$("${R_HOME}/bin/R" CMD config CXX)
+
+CFLAGS=$("${R_HOME}/bin/R" CMD config CFLAGS)
+CXXFLAGS=$("${R_HOME}/bin/R" CMD config CXXFLAGS)
+CPPFLAGS=$("${R_HOME}/bin/R" CMD config CPPFLAGS)
+LDFLAGS=$("${R_HOME}/bin/R" CMD config DYLIB_LDFLAGS )
+
+BLAS=$("${R_HOME}/bin/R" CMD config BLAS_LIBS)
+LAPACK=$("${R_HOME}/bin/R" CMD config LAPACK_LIBS)
+DYLIB_EXT=$("${R_HOME}/bin/R" CMD config DYLIB_EXT)
+
+RCXXFLAGS=$(${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()")
+RLDFLAGS=$(${R_HOME}/bin/Rscript -e "Rcpp:::LdFlags()")
+
+
+rm -rf _builds
+
+cmake -H. -B_builds \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=_install \
+    -DCMAKE_SHARED_LIBRARY_PREFIX_CXX="" \
+    -DMINC_TOOLKIT_DIR:PATH=${MINC_TOOLKIT} \
+    -DCMAKE_CXX_FLAGS:STRING="${CXXFLAGS} ${CPPFLAG} ${RCXXFLAGS} -I${R_INCLUDE_DIR}" \
+    -DCMAKE_C_FLAGS:STRING="${CXXFLAGS} ${CPPFLAG} -I${R_INCLUDE_DIR}" \
+    -DCMAKE_BLAS_LIBS:STRING="${BLAS}" \
+    -DCMAKE_LAPACK_LIBS:STRING="${LAPACK}" \
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING="${LDFLAGS}" \
+    -DCMAKE_MODULE_LINKER_FLAGS:STRING="${LDFLAGS}" 
+
+#cp _builds/Makevars src/    
+    
+cmake --build _builds --target install --config Release
+# 
+# 
+# Linux
+cp _install/lib/RMINC${DYLIB_EXT} src/ || echo "Failed: RMINC${DYLIB_EXT} -> src"
+# 
+# Mac
+#cp _install/lib/RMINC.dylib src/RMINC.so || echo "Failed: RMINC.dylib -> src"    
