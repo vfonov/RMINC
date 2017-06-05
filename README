@@ -9,6 +9,23 @@ additional information can be found here:
 https://wiki.mouseimaging.ca/display/MICePub/RMINC
 
 
+Notes
+------------
+
+This is experimental branch of RMINC that uses CMAKE for building and configuration
+To install: 
+`source /opt/minc/1.9.15/minc-toolkit-config.sh`
+or set environment variable `MINC_TOOLKIT` to the prefix of libminc 
+
+then run 
+`R CMD INSTALL <location of RMINC>`
+
+
+
+
+
+
+
 Installation:
 -------------
 

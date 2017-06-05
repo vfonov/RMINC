@@ -26,6 +26,7 @@ fi
 if [[ -z $MINC_TOOLKIT ]];then
     echo "Can't locate minc-toolkit"
     echo "Specify location using MINC_TOOLKIT environment variable !"
+    echo "TODO: use superbuild in CMake to build libminc"
     exit 1
 fi
 

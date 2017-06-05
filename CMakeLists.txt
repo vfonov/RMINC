@@ -1,9 +1,16 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(RMINC)
 
-FIND_PATH( MINC_TOOLKIT_DIR bin/mincstats  HINTS /opt/minc DOC "minc-toolkit install prefix")
-FIND_PACKAGE( LIBMINC REQUIRED HINTS ${MINC_TOOLKIT_DIR}/lib${LIB_SUFFIX})
-INCLUDE( ${LIBMINC_USE_FILE} )
+find_path( MINC_TOOLKIT_DIR bin/mincstats  HINTS /opt/minc DOC "minc-toolkit install prefix")
+find_package( LIBMINC HINTS ${MINC_TOOLKIT_DIR}/lib${LIB_SUFFIX})
+
+
+if(NOT LIBMINC_FOUND)
+message(FATAL_ERROR "TODO: use superbuild to compile libminc & libhdf/netcdf")
+endif(NOT LIBMINC_FOUND)
+
+
+include( ${LIBMINC_USE_FILE} )
 
 set(CMAKE_BLAS_LIBS "-lblas" CACHE STRING "Blas libraries")
 set(CMAKE_LAPACK_LIBS "-llapack" CACHE STRING "Lapack libraries")
