@@ -1,13 +1,49 @@
 #include <Rcpp.h>
+/*
 #include "minc2.h"
-#include "minc_cpp.h"
+#include "minc_cpp.h"*/
+
+#include "minc2-simple.h"
+
 #include <sstream>
 #include <stdlib.h>
 using namespace Rcpp;
 using namespace std;
 
+
+static vector<minc2_file_handle> _open_minc2_volumes(CharacterVector filenames){
+  
+  vector<minc2_file_handle> volumes;
+  CharacterVector::iterator file_iterator;
+  
+  for(file_iterator = filenames.begin();
+      file_iterator != filenames.end();
+      ++file_iterator)
+  {
+
+      minc2_file_handle h=minc2_allocate0();
+      if(minc2_open(h,*file_iterator)!=MINC2_SUCCESS)
+          throw "Can't open file";
+      volumes.push_back(h);
+  }
+  
+  return(volumes);
+}
+
+static void _close_minc2_volumes(vector<minc2_file_handle>& volumes)
+{
+  vector<minc2_file_handle>::iterator it;
+  for(it = volumes.begin();
+      it != volumes.end();
+      ++it)
+      {
+            minc2_close(*it);
+            minc2_free(*it);
+      }
+}
+
 // [[Rcpp::export]]
-List rcpp_minc_apply(CharacterVector filenames,
+List rcpp_minc_apply2(CharacterVector filenames,
                      bool use_mask,
                      CharacterVector mask,
                      double mask_lower_val,
@@ -18,219 +54,88 @@ List rcpp_minc_apply(CharacterVector filenames,
                      Function fun, 
                      List args) {
 
-  vector<mihandle_t> volumes = open_minc2_volumes(filenames);
-  mihandle_t mask_handle;
-  vector<mihandle_t>::iterator volume_iterator;
+  /*using idea from https://github.com/vfonov/minc2-simple/blob/master/example/RInside/example_minc_rinside.cpp*/
+  std::vector<minc2_file_handle> volumes;
+  minc2_file_handle mask_handle=NULL;
+  minc2_file_iterator_handle input_minc_it=NULL;
+  minc2_file_iterator_handle mask_minc_it=NULL;
+  size_t added_results = 0;
+  Rcpp::List results;
+  NumericVector result_inds;
   
-  if(!check_same_dimensions(volumes)){
-    for(int i = 0; i < volumes.size(); ++i){
-      miclose_volume(volumes[i]);
+  try {
+    volumes =_open_minc2_volumes(filenames);
+    std::vector<double> voxels(volumes.size());  
+    
+    if(use_mask)
+      mask_handle = _open_minc2_volumes(mask)[0]; /*TODO: check volume dimensions*/
+    
+  
+    int nvols = volumes.size();
+    int nvoxels = 0;
+    minc2_nelement(volumes[0],&nvoxels);
+    
+    results=Rcpp::List(nvoxels);
+    result_inds=Rcpp::NumericVector(nvoxels);
+    // Setup looping constructs
+    size_t voxel_pos = 0;
+    
+  
+    Rprintf("Number of Volumes: %d Number of Voxels: %d \n", nvols,nvoxels);
+    
+    input_minc_it=minc2_iterator_allocate0();
+    
+    
+    if(minc2_multi_iterator_input_start(input_minc_it,&volumes[0],MINC2_DOUBLE,volumes.size())!=MINC2_SUCCESS)
+      throw "Error in iterators"; /*this will also check that all dimension are the same*/
+    
+    if(use_mask) {
+      mask_minc_it=minc2_iterator_allocate0();
+      if(minc2_iterator_input_start(mask_minc_it,mask_handle,MINC2_DOUBLE)!=MINC2_SUCCESS)
+        throw "Error in mask iterators"; /*this will also check that all dimension are the same*/
     }
-    
-    stop("At least one file is a different size");
-  }
-  
-  if(use_mask){
-    mask_handle = open_minc2_volumes(mask)[0];
-    
-    vector<mihandle_t> mask_and_vol;
-    mask_and_vol.push_back(mask_handle);
-    mask_and_vol.push_back(volumes[0]);
-    
-    if(!check_same_dimensions(mask_and_vol)){
-      miclose_volume(mask_and_vol[0]);
-      miclose_volume(mask_and_vol[1]);
-      for(int i = 0; i < volumes.size(); ++i){
-        miclose_volume(volumes[i]);
-      }
-      
-      stop("The mask and files differ in size");
-    }  
-  }
-  
-  vector<misize_t> sizes = get_volume_dimensions(volumes[0]);
-  misize_t hyperslab_dims[3];
-  misize_t n_slabs[3];
-  
-  for(int i = 0; i < 3; ++i){
-    hyperslab_dims[i] = (misize_t) slab_sizes[i];
-    if(sizes[i] % hyperslab_dims[i] != 0){
-      n_slabs[i] = 1;
-    } else {
-      n_slabs[i] = 0;
-    }
-    
-    n_slabs[i] += (sizes[i] / hyperslab_dims[i]);
-  }
-  misize_t old_hyperslab_dims[3] = {hyperslab_dims[0], hyperslab_dims[1], hyperslab_dims[2]};
-
-  int nvols = volumes.size();
-  int nvoxels = (int) sizes[0] * sizes[1] * sizes[2];
-
-  NumericVector voxel_values(nvols);
-  misize_t voxel_offsets[3];
-
-  //Setup buffers
-  double *mask_buffer =
-    (double *) calloc(hyperslab_dims[0] * hyperslab_dims[1] * hyperslab_dims[2], sizeof(double));
-  
-  double **slab_buffer =
-    (double **) malloc(nvols * sizeof(double *));
-  
-  for(int i = 0; i < nvols; ++i){
-    slab_buffer[i] = 
-      (double *) malloc(hyperslab_dims[0] * hyperslab_dims[1] * hyperslab_dims[2] * sizeof(double));
-  }
-
-  // Setup looping constructs
-  int voxel_pos = 0;
-  int added_results = 0;
-  List results(nvoxels);
-  NumericVector result_inds(nvoxels);
-  
-  Rprintf("Number of Volumes: %d\n", nvols);
-  Rprintf("Number of slabs: %d\n", n_slabs[0] * n_slabs[1] * n_slabs[2]);
-  Rprintf("In slab: ");
- 
- for(misize_t i = 0; i < n_slabs[0]; ++i){
-   for(misize_t j= 0; j < n_slabs[1]; ++j){
-     for(misize_t k = 0; k < n_slabs[2]; ++k ){
-       
-       Rprintf("%d ", (i * n_slabs[1] * n_slabs[2]) + 
-         (j * n_slabs[2]) + 
-         k);
-       
-       //Set voxel coords
-       voxel_offsets[0] = i * hyperslab_dims[0];
-       voxel_offsets[1] = j * hyperslab_dims[1];
-       voxel_offsets[2] = k * hyperslab_dims[2];
-       
-       //Check for uneven final hyperslab
-       for(int i = 0; i < 3; ++i){
-         if((signed int)(sizes[i] - voxel_offsets[i] - hyperslab_dims[i]) < 0){
-           hyperslab_dims[i] = sizes[i] - voxel_offsets[i];
-         }
-       }
-       
-       int hyperslab_vol = hyperslab_dims[0] * hyperslab_dims[1] * hyperslab_dims[2];
-       
+    bool advance=false;
+    do {
+       bool process_voxel=1;
        //Check for user breaking the loop
        checkUserInterrupt();
        
-       //Default to processing each slab
-       bool process_slab = true;
-       
        //Check if a mask was supplied, then check if the current voxel is masked
        if(use_mask){
-         cautious_get_hyperslab(mask_handle,    // read from handle
-                                MI_TYPE_DOUBLE, // double data
-                                voxel_offsets,  // starting from position
-                                hyperslab_dims, // how many voxels
-                                mask_buffer,   // into
-                                "Error Reading Mask");
-         
-         //If using a mask, only process as slab if atleast one voxel isn't masked
-         process_slab = false;
-         for(int mv = 0; mv < hyperslab_vol; ++mv){
-           if(mask_buffer[mv] > (mask_lower_val - .5) &&
-              mask_buffer[mv] < (mask_upper_val + .5)){
-             process_slab = true;
-           }
-         }
+         double mask_val;
+         minc2_iterator_get_values(mask_minc_it,&mask_val); /*TODO: check return code*/
+          
+         process_voxel=( (mask_val > (mask_lower_val - .5) && mask_val < (mask_upper_val + .5))); /*why .5 ?*/
        }
        
-       
-       //If the slab is to be processed, read in the subjects
-       if(process_slab){
-         for(int vol = 0; vol < nvols; ++vol){
-           stringstream error_message;
-           error_message << "Error Reading Volume " << (vol + 1) << "\n";
-           
-           cautious_get_hyperslab(volumes[vol],
-                                  MI_TYPE_DOUBLE,
-                                  voxel_offsets,
-                                  hyperslab_dims,
-                                  slab_buffer[vol],
-                                             error_message.str());
-           
-           // Rprintf("Just read in a slab: ");
-           // for(int i = 0; i < (hyperslab_dims[0] * hyperslab_dims[1] * hyperslab_dims[2]); ++i){
-           //   Rprintf("%d, ", *(mask_buffer + i));
-           // }
-           // Rprintf("\n");
-         }
+       if(process_voxel) {
+         minc2_iterator_get_values(input_minc_it,&voxels[0]); /*TODO: check return code*/
+        results[added_results] = fun(voxels, args);
+        result_inds[added_results] = voxel_pos;
+        ++added_results;
        }
-         
-         for(misize_t x = 0; x < hyperslab_dims[0]; ++x){
-           for(misize_t y = 0; y < hyperslab_dims[1]; ++y){
-             for(misize_t z = 0; z < hyperslab_dims[2]; ++z){
-               
-               voxel_pos = (int)(sizes[1] * sizes[2] * (voxel_offsets[0] + x) +
-                 sizes[2] * (voxel_offsets[1] + y) +
-                 (voxel_offsets[2] + z));
-               
-               
-               if(!process_slab && !filter_masked){
-                 results[added_results] = value_for_mask;
-                 result_inds[added_results] = voxel_pos;
-                 ++added_results;
-               } else {
-                
-                 //ugly indexing into 2nd-D of slab buffer
-                 int slab_pos =  x * hyperslab_dims[1] * hyperslab_dims[2] +
-                   y * hyperslab_dims[2] +
-                   z;
-                 
-                 for(int xvol = 0; xvol < nvols; ++xvol){
-                   voxel_values[xvol] = slab_buffer[xvol][slab_pos];
-                 }
-                 
-                 double mask_val =
-                   mask_buffer[slab_pos];
-                 
-                 if((!use_mask) ||
-                    (mask_val > (mask_lower_val - .5) &&
-                    mask_val < (mask_upper_val + .5))){
-                   
-                   //Rprintf("A few voxel values %d %d %d", voxel_values[0], voxel_values[1], voxel_values[2]);
-                   results[added_results] = fun(voxel_values, args);
-                   result_inds[added_results] = voxel_pos;
-                   ++added_results;
-                   
-                 } else if(!filter_masked){
-                   results[added_results] = value_for_mask;
-                   result_inds[added_results] = voxel_pos;
-                   ++added_results;
-                 }
-               }
-             }
-           }
-         }
-     
-        
-        //reset old hyperslab dims if they changed
-        for(int i = 0; i < 3; ++i){
-          hyperslab_dims[i] = old_hyperslab_dims[i];
-        }
-      }
-    }
-  }
+       
+       voxel_pos++; /*TODO: change to the index pos?*/
+       if(use_mask)
+         minc2_iterator_next(mask_minc_it);
+    } while(minc2_iterator_next(input_minc_it)==MINC2_SUCCESS);
   
-  Rprintf("\n");
-
-  for(int i = 0; i < nvols; ++i){
-    free(slab_buffer[i]);
+  
+    Rprintf("\n");
+  } catch(const char *err) {
+    if(use_mask && mask_minc_it!=NULL)
+      minc2_iterator_free(mask_minc_it);
+    if(input_minc_it!=NULL)
+      minc2_iterator_free(input_minc_it);
+    _close_minc2_volumes(volumes);
+    stop(err);
   }
-  free(slab_buffer);
-  free(mask_buffer);
 
-  for(volume_iterator = volumes.begin(); volume_iterator != volumes.end(); ++volume_iterator){
-    miclose_volume(*volume_iterator);
-  }
-
-  if(use_mask){
-    miclose_volume(mask_handle);
-  }
+  if(use_mask && mask_minc_it!=NULL)
+    minc2_iterator_free(mask_minc_it);
+  if(input_minc_it!=NULL)
+    minc2_iterator_free(input_minc_it);
+  _close_minc2_volumes(volumes);
   
   results.erase(results.begin() + added_results, results.end());
   result_inds.erase(result_inds.begin() + added_results, result_inds.end());
@@ -239,3 +144,4 @@ List rcpp_minc_apply(CharacterVector filenames,
                       _["inds"] = result_inds);
 }
 
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */

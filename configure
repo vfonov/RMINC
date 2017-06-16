@@ -17,7 +17,8 @@ if [[ -z $MINC_TOOLKIT ]];then
     some_locations=$(find /opt -name mincresample -type f|head)
     
     if [[ ! -z $some_locations ]];then
-        MINC_TOOLKIT=${some_locations/bin\/mincresample}
+        MINC_TOOLKIT=$(dirname $some_locations)/../
+        echo "Found minc-toolkit at ${MINC_TOOLKIT}"
     fi
 else
     echo "Using minc-tolkit from ${MINC_TOOLKIT}"

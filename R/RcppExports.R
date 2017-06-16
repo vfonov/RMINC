@@ -13,6 +13,10 @@ rcpp_minc_apply <- function(filenames, use_mask, mask, mask_lower_val, mask_uppe
     .Call('RMINC_rcpp_minc_apply', PACKAGE = 'RMINC', filenames, use_mask, mask, mask_lower_val, mask_upper_val, value_for_mask, filter_masked, slab_sizes, fun, args)
 }
 
+rcpp_minc_apply2 <- function(filenames, use_mask, mask, mask_lower_val, mask_upper_val, value_for_mask, filter_masked, slab_sizes, fun, args) {
+    .Call('RMINC_rcpp_minc_apply2', PACKAGE = 'RMINC', filenames, use_mask, mask, mask_lower_val, mask_upper_val, value_for_mask, filter_masked, slab_sizes, fun, args)
+}
+
 graph_tfce_wqu <- function(map, adjacencies, E, H, nsteps, weights) {
     .Call('RMINC_graph_tfce_wqu', PACKAGE = 'RMINC', map, adjacencies, E, H, nsteps, weights)
 }
