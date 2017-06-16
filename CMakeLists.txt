@@ -10,6 +10,8 @@ message(FATAL_ERROR "TODO: use superbuild to compile libminc & libhdf/netcdf")
 endif(NOT LIBMINC_FOUND)
 
 
+set (CMAKE_CXX_STANDARD 11)
+
 include( ${LIBMINC_USE_FILE} )
 
 set(CMAKE_BLAS_LIBS "-lblas" CACHE STRING "Blas libraries")
@@ -35,6 +37,11 @@ add_library(RMINC SHARED
     src/minc2-simple/minc2-matrix-ops.c
     src/minc2-simple/minc2-simple.c
     src/minc2-simple/minc2-simple.h
+    
+    # RCPP
+    src/RcppExports.cpp
+    src/vertex_tfce.cpp
+    src/anat_summaries.cpp
     
     src/minc2_lib_reg.c
     src/minc2_read.c

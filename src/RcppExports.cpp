@@ -49,6 +49,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// rcpp_minc_apply2
+List rcpp_minc_apply2(CharacterVector filenames, bool use_mask, CharacterVector mask, double mask_lower_val, double mask_upper_val, RObject value_for_mask, bool filter_masked, NumericVector slab_sizes, Function fun, List args);
+RcppExport SEXP RMINC_rcpp_minc_apply2(SEXP filenamesSEXP, SEXP use_maskSEXP, SEXP maskSEXP, SEXP mask_lower_valSEXP, SEXP mask_upper_valSEXP, SEXP value_for_maskSEXP, SEXP filter_maskedSEXP, SEXP slab_sizesSEXP, SEXP funSEXP, SEXP argsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< CharacterVector >::type filenames(filenamesSEXP);
+    Rcpp::traits::input_parameter< bool >::type use_mask(use_maskSEXP);
+    Rcpp::traits::input_parameter< CharacterVector >::type mask(maskSEXP);
+    Rcpp::traits::input_parameter< double >::type mask_lower_val(mask_lower_valSEXP);
+    Rcpp::traits::input_parameter< double >::type mask_upper_val(mask_upper_valSEXP);
+    Rcpp::traits::input_parameter< RObject >::type value_for_mask(value_for_maskSEXP);
+    Rcpp::traits::input_parameter< bool >::type filter_masked(filter_maskedSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type slab_sizes(slab_sizesSEXP);
+    Rcpp::traits::input_parameter< Function >::type fun(funSEXP);
+    Rcpp::traits::input_parameter< List >::type args(argsSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_minc_apply2(filenames, use_mask, mask, mask_lower_val, mask_upper_val, value_for_mask, filter_masked, slab_sizes, fun, args));
+    return rcpp_result_gen;
+END_RCPP
+}
 // graph_tfce_wqu
 std::vector<double> graph_tfce_wqu(std::vector<double> map, std::vector<std::vector<int> > adjacencies, double E, double H, int nsteps, std::vector<double> weights);
 RcppExport SEXP RMINC_graph_tfce_wqu(SEXP mapSEXP, SEXP adjacenciesSEXP, SEXP ESEXP, SEXP HSEXP, SEXP nstepsSEXP, SEXP weightsSEXP) {
