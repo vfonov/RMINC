@@ -17,23 +17,37 @@ set(CMAKE_LAPACK_LIBS "-llapack" CACHE STRING "Lapack libraries")
 
 include(GenerateExportHeader)
 
-INCLUDE_DIRECTORIES(${LIBMINC_INCLUDE_DIRS})
+include_directories(${LIBMINC_INCLUDE_DIRS})
 link_directories(${LIBMINC_LIBRARY_DIRS})
 include_directories("${CMAKE_CURRENT_BINARY_DIR}") 
 
+include_directories(src/minc2-simple)
+
 add_library(RMINC SHARED 
+    # minc_cpp_apply
+    src/minc_apply.cpp
+    src/minc_cpp.cpp
+    
+    # minc_cpp_apply2
+    src/minc_apply2.cpp
+    
+    # MINC2 simple
+    src/minc2-simple/minc2-matrix-ops.c
+    src/minc2-simple/minc2-simple.c
+    src/minc2-simple/minc2-simple.h
+    
     src/minc2_lib_reg.c
     src/minc2_read.c
     src/minc2_support.c
     src/minc2_write.c
     src/minc_anova.c
-    src/minc_apply.cpp
-    src/minc_cpp.cpp
     src/minc_reader.c
     src/modelling_functions.c
     src/slice_loop_functions.c
     src/vertex_modelling.c
+    
 )
+
 target_link_libraries(RMINC ${LIBMINC_LIBRARIES} ${CMAKE_LAPACK_LIBS} ${CMAKE_BLAS_LIBS} )
 
 generate_export_header(RMINC)

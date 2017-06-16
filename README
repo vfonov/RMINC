@@ -21,6 +21,10 @@ then run
 `R CMD INSTALL <location of RMINC>`
 
 
+Prerequisits
+--------------
+Building: cmake 
+R packages: BatchJobs dplyr tidyr lme4 shiny Rcpp yaml
 
 
 
